@@ -42,38 +42,49 @@ fun UserListScreen(
     vm: UserlistViewModel = hiltViewModel()
 ) {
     BackHandler(true) {
-        vm.closeSocket()
-        vm.callDismiss()
         navController.popBackStack()
     }
     val state = vm.state.value
     val context = LocalContext.current
 
-//    LaunchedEffect(key1 = true) {
-//        vm.sideEffect.collectLatest { sideEffect ->
-//            when (sideEffect) {
-//                is UserListSideEffect.GoCallScreen -> {
-//                    Log.e("UserlistScreen","going to call screen")
-//                    navController.navigate(
-//                        Screen.CallScreen.route +
-//                                "?${Constant.USERNAMEKEY}=${sideEffect.userName}" +
-//                                "&${Constant.TARGETNAMEKEY}=${sideEffect.targetName}")
-//                }
-//            }
-//        }
-//    }
+    LaunchedEffect(key1 = true) {
+        vm.sideEffect.collectLatest { sideEffect ->
+            when (sideEffect) {
+                is UserListSideEffect.GoCallScreen -> {
+                    Log.e("UserlistScreen","going to call screen")
+                    navController.navigate(
+                        Screen.CallScreen.route +
+                                "?${Constant.USERNAMEKEY}=${sideEffect.userName}" +
+                                "&${Constant.TARGETNAMEKEY}=${sideEffect.targetName}")
+                }
+            }
+        }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
         contentAlignment = Alignment.TopStart
     ) {
-//        if(state.isCallStart) {
-            Box(modifier = Modifier.fillMaxSize()){
-                CallScreen(setRemoteRenderer = vm::setRemoteRenderView, setLocalRenderer = vm::setLocalRenderView)
-            }
-//         else {
-        if(!state.isCallStart){
+
+        if(state.isCallRequest) {
+            AlertDialog(
+                onDismissRequest = {
+                    vm.callReject()
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        state.callerName?.let { targetName ->
+                            vm.answer(targetName)
+                        }
+                    }) {
+                        Text("Receive")
+                    }
+                },
+                title = { Text("Incoming Call") },
+                text = { Text(text = "Your have call from ${state.callerName}") }
+            )
+        }else {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -129,28 +140,8 @@ fun UserListScreen(
                             }
                         }
                     }
-//            }
                 }
             }
         }
     }
 }
-
-//if (state.isIncomingCall) {
-//    AlertDialog(
-//        onDismissRequest = {
-//            vm.callDismiss()
-//        },
-//        confirmButton = {
-//            Button(onClick = {
-//                state.callerName?.let { targetName ->
-//                    vm.answer(targetName)
-//                }
-//            }) {
-//                Text("Receive")
-//            }
-//        },
-//        title = { Text("Incoming Call") },
-//        text = { Text(text = "Your have call from ${state.callerName}") }
-//    )
-//}

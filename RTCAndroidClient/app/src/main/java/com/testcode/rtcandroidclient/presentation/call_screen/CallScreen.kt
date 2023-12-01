@@ -16,12 +16,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import org.webrtc.SurfaceViewRenderer
 
-private val TAG = "userListViewModel"
+private val TAG = "CallScreen"
 
 @Composable
 fun CallScreen(
-    setRemoteRenderer: (SurfaceViewRenderer) -> Unit,
-    setLocalRenderer: (SurfaceViewRenderer) -> Unit
+    navController: NavController,
+    vm: CallViewModel = hiltViewModel()
 ) {
     Box(
         modifier = Modifier
@@ -33,7 +33,7 @@ fun CallScreen(
         AndroidView(
             factory = { context ->
                 SurfaceViewRenderer(context).also {
-                    setRemoteRenderer(it)
+                    vm.setRemoteRenderView(it)
                 }
             },
         )
@@ -46,7 +46,7 @@ fun CallScreen(
             AndroidView(
                 factory = { context ->
                     SurfaceViewRenderer(context).also {
-                        setLocalRenderer(it)
+                        vm.setLocalRenderView(it)
                     }
                 },
                 modifier = Modifier.clip(RoundedCornerShape(50.dp))

@@ -33,10 +33,10 @@ object AppModule {
         return SocketClient(client)
     }
 
-//    @Provides
-//    @Singleton
-//    fun provideRtcClient(app: Application, socketRepository: SocketRepository): RtcClient {
-//        return RtcClient(app, socketRepository)
-//    }
+    @Provides
+    @Singleton
+    fun provideRtcClient(app: Application, socketRepository: SocketRepository): RtcClient {
+        return RtcClient(app, socketRepository)
+    }
 
 }

@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         ) {
-//                            CallScreen(navController = navController)
+                            CallScreen(navController = navController)
                         }
                     }
                 }

@@ -3,6 +3,7 @@ package com.testcode.rtcandroidclient.data.repository
 import com.google.gson.Gson
 import com.testcode.rtcandroidclient.data.remote.Response
 import com.testcode.rtcandroidclient.data.remote.SocketClient
+import com.testcode.rtcandroidclient.data.remote.dto.CallRequestData
 import com.testcode.rtcandroidclient.data.remote.dto.IceRequestData
 import com.testcode.rtcandroidclient.data.remote.dto.Request
 import com.testcode.rtcandroidclient.data.remote.dto.RequestType
@@ -36,6 +37,20 @@ class SocketRepositoryImpl @Inject constructor(
                 type = RequestType.GET_ONLINE_USER,
                 name = userName,
                 data = null
+            )
+        )
+    }
+
+    override suspend fun sendCallRequest(userName: String, target: String) {
+        socketClient.sendRequest(
+            Request(
+                type = RequestType.CALL_REQUEST,
+                name = userName,
+                data = gson.toJson(
+                    CallRequestData(
+                        target = target
+                    )
+                )
             )
         )
     }

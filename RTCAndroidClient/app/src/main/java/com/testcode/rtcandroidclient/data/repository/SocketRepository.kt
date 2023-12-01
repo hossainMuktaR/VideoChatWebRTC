@@ -12,6 +12,7 @@ interface SocketRepository {
     suspend fun getOnlineUser(userName: String)
 
     suspend fun receiveResponse(): Flow<Response>
+    suspend fun sendCallRequest(userName: String, target: String)
     suspend fun sendOffer(userName: String,targetName: String, sdp: String)
     suspend fun sendCreateAnswer(userName: String,targetName: String, sdp: String)
     suspend fun sendIceCandidate(userName: String,target: String, iceCandidate: IceCandidate)

@@ -11,6 +11,7 @@ import com.google.gson.Gson
 import com.testcode.rtcandroidclient.data.rtc.PeerConnectionObserver
 import com.testcode.rtcandroidclient.data.rtc.RtcClient
 import com.testcode.rtcandroidclient.common.Constant
+import com.testcode.rtcandroidclient.data.remote.CallResponseData
 import com.testcode.rtcandroidclient.data.remote.IceResponseData
 import com.testcode.rtcandroidclient.data.remote.ListOfUserResData
 import com.testcode.rtcandroidclient.data.remote.ResponseType
@@ -40,17 +41,12 @@ class UserlistViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
-    private lateinit var localRender: SurfaceViewRenderer
-    private lateinit var remoteRender: SurfaceViewRenderer
-
     private val gson = Gson()
-    lateinit var rtcClient: RtcClient
-
     private val _state = mutableStateOf(UserListState())
     val state: State<UserListState> = _state
 
-//    private val _sideEffect = MutableSharedFlow<UserListSideEffect>()
-//    val sideEffect: SharedFlow<UserListSideEffect> = _sideEffect
+    private val _sideEffect = MutableSharedFlow<UserListSideEffect>()
+    val sideEffect: SharedFlow<UserListSideEffect> = _sideEffect
 
 
     init {
@@ -61,42 +57,6 @@ class UserlistViewModel @Inject constructor(
         viewModelScope.launch {
             observeResponse()
             requestGetOnlineUser(state.value.userName!!)
-
-        }
-        rtcClient = RtcClient(application, socketRepository, object : PeerConnectionObserver() {
-            override fun onIceCandidate(iceCandidate: IceCandidate?) {
-                super.onIceCandidate(iceCandidate)
-                rtcClient.addIceCandidate(iceCandidate)
-                Log.d(TAG, "onIcecanditate called from callviewmodel")
-                viewModelScope.launch {
-                    socketRepository.sendIceCandidate(
-                        state.value.userName!!,
-                        state.value.callerName!!,
-                        iceCandidate!!
-                    )
-                }
-            }
-
-            override fun onAddStream(mediaStream: MediaStream?) {
-                super.onAddStream(mediaStream)
-                mediaStream?.videoTracks?.get(0)?.addSink(remoteRender)
-                Log.d(TAG, "onAddStream call")
-            }
-
-//            override fun onAddTrack(
-//                rtpReceiver: RtpReceiver?,
-//                mediaStreams: Array<out MediaStream>?
-//            ) {
-//                super.onAddTrack(rtpReceiver, mediaStreams)
-//                mediaStreams?.get(0)?.videoTracks?.get(0)?.addSink(remoteRender)
-//                Log.d(TAG, "onAddTrack call")
-//            }
-
-            override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
-                Log.d(TAG, "ICE Connection State: $iceConnectionState")
-            }
-        }).apply {
-            setScope(viewModelScope)
         }
     }
 
@@ -107,17 +67,6 @@ class UserlistViewModel @Inject constructor(
         }
     }
 
-    fun setLocalRenderView(localRenderer: SurfaceViewRenderer) {
-        localRender = localRenderer
-        rtcClient.initSurfaceView(localRender)
-        rtcClient.startLocalVideo(localRender)
-        Log.e(TAG, "start video capture start")
-    }
-
-    fun setRemoteRenderView(remoteRenderer: SurfaceViewRenderer) {
-        remoteRender = remoteRenderer
-        rtcClient.initSurfaceView(remoteRender)
-    }
 
     private suspend fun observeResponse() {
         socketRepository.receiveResponse().onEach { response ->
@@ -130,53 +79,14 @@ class UserlistViewModel @Inject constructor(
                     Log.e(TAG, "list of user response: ${listOfuserData}")
                 }
 
-                ResponseType.CALL_RESPONSE -> {}
-                ResponseType.OFFER_RECEIVED_RESPONSE -> {
-                    val sdpResponseData = gson.fromJson(response.data, SdpResponseData::class.java)
-                    val session = SessionDescription(
-                        SessionDescription.Type.OFFER,
-                        sdpResponseData.sdp
+                ResponseType.CALL_REQUEST_RESPONSE -> {
+                    val callResponseData = gson.fromJson(response.data, CallResponseData::class.java)
+                    _state.value = _state.value.copy(
+                        callerName = callResponseData.target,
+                        isCallRequest = true
                     )
-                    _state.value = state.value.copy(
-                        callerName = response.name,
-                        isCallStart = true
-                    )
-                    Log.e(TAG, "sdp response from offer: ${sdpResponseData.sdp}")
-                    rtcClient.onRemoteSessionReceived(session)
-                    rtcClient.answer(state.value.userName!!, response.name)
-
-                    //2nd user call screen start
                 }
-
-                ResponseType.ANSWER_RECEIVED_RESPONSE -> {
-                    val sdpResponseData = gson.fromJson(response.data, SdpResponseData::class.java)
-                    val session = SessionDescription(
-                        SessionDescription.Type.ANSWER,
-                        sdpResponseData.sdp
-                    )
-                    Log.e(TAG, "sdp response from answer: ${sdpResponseData.sdp}")
-                    rtcClient.onRemoteSessionReceived(session)
-//                    viewModelScope.launch {
-//                        _sideEffect.emit(UserListSideEffect.GoCallScreen(state.value.userName!!, state.value.callerName!!))
-//                    }
-                    //1st user call screen start
-                }
-
-                ResponseType.ICE_CANDIDATE_RESPONSE -> {
-                    val iceResponsedata = gson.fromJson(response.data, IceResponseData::class.java)
-                    try {
-                        rtcClient.addIceCandidate(
-                            IceCandidate(
-                                iceResponsedata.sdpMid,
-                                iceResponsedata.sdpMLineIndex,
-                                iceResponsedata.sdpCandidate
-                            )
-                        )
-                        Log.e(TAG, "ice response: ${iceResponsedata.sdpCandidate}")
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
+                else -> {}
             }
 
         }.launchIn(viewModelScope)
@@ -185,44 +95,25 @@ class UserlistViewModel @Inject constructor(
     fun call(target: String) {
         _state.value = state.value.copy(
             callerName = target,
-            isIncomingCall = false,
-            isCallStart = true
         )
-        rtcClient.call(state.value.userName!!, target)
+        val userName = _state.value.userName!!
+        viewModelScope.launch {
+            socketRepository.sendCallRequest(userName, target)
+            _sideEffect.emit(UserListSideEffect.GoCallScreen(userName, target))
+        }
+        Log.d(TAG,"Call request send")
     }
 
     fun answer(target: String) {
-        rtcClient.answer(state.value.userName!!, target)
-//        viewModelScope.launch {
-//            _sideEffect.emit(UserListSideEffect.GoCallScreen(state.value.userName!!, target))
-//        }
-        _state.value = state.value.copy(
-            isIncomingCall = false,
-            isCallStart = true
-        )
-
-    }
-
-    fun callDismiss() {
-        _state.value = state.value.copy(
-            isIncomingCall = false,
-            callerName = null,
-            isCallStart = false,
-        )
-        closeSocket()
-    }
-
-    fun closeSocket() {
         viewModelScope.launch {
-            socketRepository.tryDisconnect()
+            _sideEffect.emit(UserListSideEffect.GoCallScreen(state.value.userName!!, target))
         }
     }
-
-    override fun onCleared() {
-        super.onCleared()
-        closeSocket()
+    fun callReject() {
+        _state.value = state.value.copy(
+            isCallRequest = false
+        )
     }
-
 }
 
 sealed class UserListSideEffect {
