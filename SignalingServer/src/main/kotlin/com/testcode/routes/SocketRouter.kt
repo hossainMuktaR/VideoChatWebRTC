@@ -1,75 +1,176 @@
 package com.testcode.routes
 
 
+import com.google.gson.Gson
 import com.testcode.data.model.User
-import com.testcode.domain.Request
-import com.testcode.domain.type
+import com.testcode.domain.*
 import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
-import kotlinx.serialization.json.Json
-import java.util.Collections
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import java.util.*
+
+//val json = Json {
+//    encodeDefaults = true
+//    isLenient = true
+//    allowStructuredMapKeys = true
+//    useArrayPolymorphism = false
+//}
 
 fun Route.configSocketRoute() {
-    val users = Collections.synchronizedSet<User?>(LinkedHashSet())
+    val users = Collections.synchronizedSet<User>(LinkedHashSet())
+//    val users = LinkedHashSet<User>(
+//        listOf(
+//            User("a", null),
+//            User("b", null),
+//            User("c", null),
+//            User("d", null)
+//        )
+//    )
+    var user: User? = null
+    val gson = Gson()
     webSocket("/") {
         try {
             for (frame in incoming) {
                 if (frame !is Frame.Text) return@webSocket
-                val request = Json.decodeFromString<Request>(frame.readText())
-                val user = users.find { request.user?.name == it.name }
-                when (request.type) {
-                    type.STORE_USER -> {
+                val requestData = gson.fromJson(frame.readText(), Request::class.java)
+                println("Request from ${requestData.name}: $requestData")
+                user = users.find { requestData.name == it.name }
+                when (requestData.type) {
+                    RequestType.STORE_USER -> {
                         if (user != null) {
                             //if user already exits
-                            send(user.toString())
+//                            send(user.toString())
                             close()
                             return@webSocket
                         }
-                        val newUser = request.user?.let {
-                            User(
-                                name = it.name,
-                                conn = this
+                        user = User(
+                            name = requestData.name ?: "Guest",
+                            conn = this
+                        )
+                        users.add(user!!)
+                        println("user added. name: ${user?.name}")
+//                        send("User ${newUser?.name} Stored")
+                    }
+
+                    RequestType.GET_ONLINE_USER -> {
+                        val listOfOnlineUser = users.filter { user?.name != it.name }
+                        val listOfUserData = gson.toJson(ListOfUserResData(
+                            listOfUser = listOfOnlineUser.map { it.name }
+                        ))
+                        val response = gson.toJson(
+                            Response(
+                                type = ResponseType.LIST_OF_USER,
+                                name = user?.name ?: "Guest",
+                                data = listOfUserData
                             )
-                        }
-                        users.add(newUser)
-                        send("User ${newUser?.name} Stored")
+                        )
+                        send(response)
+                        println("list of user response: $response")
                     }
 
-                    type.START_CALL -> {
-                        val userToCall = users.find { request.data?.target == it.name }
+                    RequestType.START_CALL -> {
+                        val data = gson.fromJson(requestData.data, StartCallRequestData::class.java)
+                        val userToCall = users.find { data.target == it.name }
                         if (userToCall != null) {
-                            send("User is ready to call")
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.CALL_RESPONSE,
+                                    name = requestData.name,
+                                    data = gson.toJson(CallResponseData("User is Ready to Call"))
+                                )
+                            )
+                            user?.conn?.send(response)
                         } else {
-                            send("User not online")
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.CALL_RESPONSE,
+                                    name = requestData.name,
+                                    data = gson.toJson(CallResponseData("User is not online"))
+                                )
+                            )
+                            user?.conn?.send(response)
                         }
                     }
 
-                    type.CREATE_OFFER ->{
-                        val userToReceiveCall = users.find { request.data?.target == it.name }
+                    RequestType.CREATE_OFFER -> {
+                        val data = gson.fromJson(requestData.data, SdpRequestData::class.java)
+                        val userToReceiveCall = users.find { data.target == it.name }
                         if (userToReceiveCall != null) {
-                            userToReceiveCall.conn?.send("Ready to receive call from ${user?.name}")
+                            val sdpData = gson.toJson(
+                                SdpResponseData(
+                                    sdp = data.sdp
+                                )
+                            )
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.OFFER_RECEIVED_RESPONSE,
+                                    name = requestData.name,
+                                    data = sdpData
+                                )
+                            )
+                            println("sdp offer String: ${data.sdp}")
+                            println("sdp response: ${response}")
+                            userToReceiveCall.conn?.send(response)
                         }
                     }
-                    type.CREATE_ANSWER -> {
-                        val userToReceiveAnswer = users.find { request.data?.target == it.name }
-                        if ( userToReceiveAnswer!= null) {
-                            userToReceiveAnswer.conn?.send("Answer received call from ${user?.name}")
+
+                    RequestType.CREATE_ANSWER -> {
+                        val data = gson.fromJson(requestData.data, SdpRequestData::class.java)
+                        val userToReceiveAnswer = users.find { data.target == it.name }
+                        if (userToReceiveAnswer != null) {
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.ANSWER_RECEIVED_RESPONSE,
+                                    name = requestData.name,
+                                    data = gson.toJson(
+                                        SdpResponseData(
+                                            sdp = data.sdp
+                                        )
+                                    )
+                                )
+                            )
+                            println("sdp answer String: ${data.sdp}")
+                            userToReceiveAnswer.conn?.send(response)
                         }
                     }
-                    type.ICE_CANDIDATE -> {
-                        val userToReceiveIceCandidate = users.find { request.data?.target == it.name }
+
+                    RequestType.ICE_CANDIDATE -> {
+                        val data = gson.fromJson(requestData.data, IceRequestData::class.java)
+                        val userToReceiveIceCandidate = users.find { data.target == it.name }
                         if (userToReceiveIceCandidate != null) {
-                            userToReceiveIceCandidate.conn?.send("received ice candidate")
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.ICE_CANDIDATE_RESPONSE,
+                                    name = requestData.name,
+                                    data = gson.toJson(
+                                        IceResponseData(
+                                            sdpMLineIndex = data.sdpMLineIndex,
+                                            sdpMid = data.sdpMid,
+                                            sdpCandidate = data.sdpCandidate,
+                                        )
+                                    )
+                                )
+                            )
+                            userToReceiveIceCandidate.conn?.send(response)
                         }
                     }
                 }
             }
+        } catch (e: ClosedReceiveChannelException) {
+            println("ClosedReceiveChannelException Found")
+            user.let {
+                users.remove(it)
+            }
+            user = null
         } catch (e: Exception) {
             println(e.localizedMessage)
         } finally {
             println("Removing thisConnection!")
-//            connections -= thisConnection
+            user.let {
+                users.remove(it)
+            }
+            user = null
         }
     }
 }

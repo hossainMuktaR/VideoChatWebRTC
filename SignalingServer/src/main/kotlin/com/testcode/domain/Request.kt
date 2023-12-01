@@ -1,28 +1,23 @@
 package com.testcode.domain
 
-import com.testcode.data.model.User
-import kotlinx.serialization.Serializable
-
-@Serializable
 data class Request(
-    val type: type,
-    val user: User?,
-    val data: RequestData?
+    val type: RequestType,
+    val name: String,
+    val data: String?
 )
-
-@Serializable
-data class RequestData(
+data class StartCallRequestData(
+    val target: String
+)
+data class SdpRequestData(
     val target: String,
-    val sdp: String?,
-    val ice: Ice?
+    val sdp: String,
 )
-@Serializable
-data class Ice (
-    val sdpMLineIndex: String,
+data class IceRequestData(
+    val target: String,
+    val sdpMLineIndex: Int,
     val sdpMid: String,
     val sdpCandidate: String
 )
-
-enum class type {
-    STORE_USER, START_CALL, CREATE_OFFER, CREATE_ANSWER, ICE_CANDIDATE
+enum class RequestType {
+    STORE_USER, GET_ONLINE_USER, START_CALL, CREATE_OFFER, CREATE_ANSWER, ICE_CANDIDATE
 }

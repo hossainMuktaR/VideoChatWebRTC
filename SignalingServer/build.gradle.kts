@@ -33,6 +33,8 @@ dependencies {
 //    websocket
     implementation("io.ktor:ktor-server-websockets-jvm")
 //    serialization
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktor_version")
+    implementation("io.ktor:ktor-serialization-gson:$ktor_version")
+    //coroutine
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
 }
 
