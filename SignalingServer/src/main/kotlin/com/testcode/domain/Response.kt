@@ -8,7 +8,7 @@ data class ListOfUserResData(
     val listOfUser: List<String>?
 )
 data class CallResponseData(
-    val message: String
+    val target: String?
 )
 data class SdpResponseData(
     val sdp: String
@@ -19,5 +19,5 @@ data class IceResponseData(
     val sdpCandidate: String
 )
 enum class ResponseType {
-    LIST_OF_USER, CALL_RESPONSE, OFFER_RECEIVED_RESPONSE, ANSWER_RECEIVED_RESPONSE, ICE_CANDIDATE_RESPONSE
+    LIST_OF_USER, CALL_REQUEST_RESPONSE, OFFER_RECEIVED_RESPONSE, ANSWER_RECEIVED_RESPONSE, ICE_CANDIDATE_RESPONSE
 }
