@@ -81,10 +81,12 @@ class UserlistViewModel @Inject constructor(
 
                 ResponseType.CALL_REQUEST_RESPONSE -> {
                     val callResponseData = gson.fromJson(response.data, CallResponseData::class.java)
-                    _state.value = _state.value.copy(
-                        callerName = callResponseData.target,
-                        isCallRequest = true
-                    )
+                    callResponseData.target?.let{
+                        _state.value = _state.value.copy(
+                            callerName = it,
+                            isCallRequest = true
+                        )
+                    }
                 }
                 else -> {}
             }

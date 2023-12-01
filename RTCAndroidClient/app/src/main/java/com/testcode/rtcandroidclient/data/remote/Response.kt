@@ -8,7 +8,7 @@ data class ListOfUserResData(
     val listOfUser: List<String>?
 )
 data class CallResponseData(
-    val target: String
+    val target: String?
 )
 data class SdpResponseData(
     val sdp: String
