@@ -69,24 +69,24 @@ fun Route.configSocketRoute() {
                         println("list of user response: $response")
                     }
 
-                    RequestType.START_CALL -> {
-                        val data = gson.fromJson(requestData.data, StartCallRequestData::class.java)
+                    RequestType.CALL_REQUEST -> {
+                        val data = gson.fromJson(requestData.data, CallRequestData::class.java)
                         val userToCall = users.find { data.target == it.name }
                         if (userToCall != null) {
                             val response = gson.toJson(
                                 Response(
-                                    ResponseType.CALL_RESPONSE,
+                                    ResponseType.CALL_REQUEST_RESPONSE,
                                     name = requestData.name,
-                                    data = gson.toJson(CallResponseData("User is Ready to Call"))
+                                    data = gson.toJson(CallResponseData(target = data.target))
                                 )
                             )
                             user?.conn?.send(response)
                         } else {
                             val response = gson.toJson(
                                 Response(
-                                    ResponseType.CALL_RESPONSE,
+                                    ResponseType.CALL_REQUEST_RESPONSE,
                                     name = requestData.name,
-                                    data = gson.toJson(CallResponseData("User is not online"))
+                                    data = gson.toJson(CallResponseData(target = null))
                                 )
                             )
                             user?.conn?.send(response)
