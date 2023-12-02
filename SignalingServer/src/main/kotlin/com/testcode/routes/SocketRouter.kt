@@ -8,27 +8,15 @@ import io.ktor.server.routing.*
 import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
+import kotlinx.coroutines.delay
 import java.util.*
 
-//val json = Json {
-//    encodeDefaults = true
-//    isLenient = true
-//    allowStructuredMapKeys = true
-//    useArrayPolymorphism = false
-//}
 
 fun Route.configSocketRoute() {
     val users = Collections.synchronizedSet<User>(LinkedHashSet())
-//    val users = LinkedHashSet<User>(
-//        listOf(
-//            User("a", null),
-//            User("b", null),
-//            User("c", null),
-//            User("d", null)
-//        )
-//    )
     var user: User? = null
     val gson = Gson()
+
     webSocket("/") {
         try {
             for (frame in incoming) {
@@ -39,8 +27,6 @@ fun Route.configSocketRoute() {
                 when (requestData.type) {
                     RequestType.STORE_USER -> {
                         if (user != null) {
-                            //if user already exits
-//                            send(user.toString())
                             close()
                             return@webSocket
                         }
@@ -50,7 +36,7 @@ fun Route.configSocketRoute() {
                         )
                         users.add(user!!)
                         println("user added. name: ${user?.name}")
-//                        send("User ${newUser?.name} Stored")
+
                     }
 
                     RequestType.GET_ONLINE_USER -> {
@@ -76,11 +62,39 @@ fun Route.configSocketRoute() {
                             val response = gson.toJson(
                                 Response(
                                     ResponseType.CALL_REQUEST_RESPONSE,
+                                    name = data.target,
+                                    data = gson.toJson(CallResponseData(target = requestData.name))
+                                )
+                            )
+                            println("Call request come from: ${requestData.name}")
+                            println("Call response send to: ${data.target}")
+                            userToCall.conn?.send(response)
+                        } else {
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.CALL_REQUEST_RESPONSE,
                                     name = requestData.name,
-                                    data = gson.toJson(CallResponseData(target = data.target))
+                                    data = gson.toJson(CallResponseData(target = null))
                                 )
                             )
                             user?.conn?.send(response)
+                        }
+                    }
+                    RequestType.ANSWER_REQUEST -> {
+                        val data = gson.fromJson(requestData.data, CallRequestData::class.java)
+                        val userToCall = users.find { data.target == it.name }
+                        if (userToCall != null) {
+                            val response = gson.toJson(
+                                Response(
+                                    ResponseType.ANSWER_REQUEST_RESPONSE,
+                                    name = data.target,
+                                    data = gson.toJson(CallResponseData(target = requestData.name))
+                                )
+                            )
+                            delay(2000)
+                            println("answer request come from: ${requestData.name}")
+                            println("answer response send to: ${data.target}")
+                            userToCall.conn?.send(response)
                         } else {
                             val response = gson.toJson(
                                 Response(
