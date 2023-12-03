@@ -9,6 +9,7 @@ import com.testcode.rtcandroidclient.data.remote.dto.Request
 import com.testcode.rtcandroidclient.data.remote.dto.RequestType
 import com.testcode.rtcandroidclient.data.remote.dto.SdpRequestData
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharedFlow
 import org.webrtc.IceCandidate
 import javax.inject.Inject
 
@@ -45,6 +46,20 @@ class SocketRepositoryImpl @Inject constructor(
         socketClient.sendRequest(
             Request(
                 type = RequestType.CALL_REQUEST,
+                name = userName,
+                data = gson.toJson(
+                    CallRequestData(
+                        target = target
+                    )
+                )
+            )
+        )
+    }
+
+    override suspend fun sendAnswerRequest(userName: String, target: String) {
+        socketClient.sendRequest(
+            Request(
+                type = RequestType.ANSWER_REQUEST,
                 name = userName,
                 data = gson.toJson(
                     CallRequestData(

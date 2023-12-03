@@ -19,6 +19,7 @@ import com.testcode.rtcandroidclient.data.remote.SdpResponseData
 import com.testcode.rtcandroidclient.data.repository.SocketRepository
 import com.testcode.rtcandroidclient.presentation.login_screen.LoginSideEffect
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.launchIn
@@ -36,7 +37,6 @@ private val TAG = "userListViewModel"
 
 @HiltViewModel
 class UserlistViewModel @Inject constructor(
-    application: Application,
     private val socketRepository: SocketRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -47,7 +47,7 @@ class UserlistViewModel @Inject constructor(
 
     private val _sideEffect = MutableSharedFlow<UserListSideEffect>()
     val sideEffect: SharedFlow<UserListSideEffect> = _sideEffect
-
+    private var observeJob: Job? = null
 
     init {
         _state.value = state.value.copy(
@@ -69,7 +69,7 @@ class UserlistViewModel @Inject constructor(
 
 
     private suspend fun observeResponse() {
-        socketRepository.receiveResponse().onEach { response ->
+        observeJob = socketRepository.receiveResponse().onEach { response ->
             when (response.type) {
                 ResponseType.LIST_OF_USER -> {
                     val listOfuserData = gson.fromJson(response.data, ListOfUserResData::class.java)
@@ -99,6 +99,7 @@ class UserlistViewModel @Inject constructor(
             callerName = target,
         )
         val userName = _state.value.userName!!
+        observeJob?.cancel()
         viewModelScope.launch {
             socketRepository.sendCallRequest(userName, target)
             _sideEffect.emit(UserListSideEffect.GoCallScreen(userName, target))
@@ -107,7 +108,9 @@ class UserlistViewModel @Inject constructor(
     }
 
     fun answer(target: String) {
+        observeJob?.cancel()
         viewModelScope.launch {
+            socketRepository.sendAnswerRequest(_state.value.userName!!, target)
             _sideEffect.emit(UserListSideEffect.GoCallScreen(state.value.userName!!, target))
         }
     }
@@ -115,6 +118,12 @@ class UserlistViewModel @Inject constructor(
         _state.value = state.value.copy(
             isCallRequest = false
         )
+    }
+    fun closeSocketConnection() {
+        viewModelScope.launch {
+        socketRepository.tryDisconnect()
+
+        }
     }
 }
 

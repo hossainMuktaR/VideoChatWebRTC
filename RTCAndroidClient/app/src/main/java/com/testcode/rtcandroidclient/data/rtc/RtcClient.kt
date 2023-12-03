@@ -7,7 +7,9 @@ import android.util.Log
 import com.testcode.rtcandroidclient.data.repository.SocketRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import org.webrtc.AudioTrack
 import org.webrtc.Camera2Enumerator
+import org.webrtc.CameraVideoCapturer
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
@@ -21,6 +23,7 @@ import org.webrtc.SessionDescription
 import org.webrtc.SurfaceTextureHelper
 import org.webrtc.SurfaceViewRenderer
 import org.webrtc.VideoCapturer
+import org.webrtc.VideoTrack
 
 
 class RtcClient(
@@ -52,8 +55,13 @@ class RtcClient(
     }
 
     private val peerConnection by lazy {   createPeerConnection(observer) }
-    private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(false) }
+    private val videoCapturer by lazy {   getVideoCapturer(application) }
+    private val localVideoSource by lazy { peerConnectionFactory.createVideoSource(videoCapturer.isScreencast) }
     private val localAudioSource by lazy { peerConnectionFactory.createAudioSource(MediaConstraints()) }
+
+    private var localAudioTrack : AudioTrack? = null
+    private var localVideoTrack : VideoTrack? = null
+
     private fun initPeerConnectionFactory(application: Application) {
         val peerConnectionOptions = PeerConnectionFactory.InitializationOptions.builder(application)
             .setEnableInternalTracer(true)
@@ -92,74 +100,49 @@ class RtcClient(
         }
     }
 
+    //refactor code
     fun startLocalVideo(surface: SurfaceViewRenderer) {
+        checkNotNull(peerConnectionFactory) { "PeerConnectionFactory must not be null" }
+        checkNotNull(localVideoSource) { "LocalVideoSource must not be null" }
+        checkNotNull(peerConnection) { "PeerConnection must not be null" }
+
         // Use the main looper for WebRTC operations
         val rtcThread = HandlerThread("RTCThread")
         rtcThread.start()
+
         val surfaceTextureHelper =
-            SurfaceTextureHelper.create(rtcThread.name, eglBase.eglBaseContext)
-        val videoCapturer = getVideoCapturer(application)
-        videoCapturer.initialize(
-            surfaceTextureHelper,
-            surface.context,
-            localVideoSource.capturerObserver
-        )
-        videoCapturer.startCapture(320, 240, 30)
-        val localVideoTrack =
-            peerConnectionFactory.createVideoTrack("local_track_video", localVideoSource)
+            SurfaceTextureHelper.create("RTCThread", eglBase.eglBaseContext)
+
+        // Ensure videoCapturer is not null and properly initialized
+        checkNotNull(videoCapturer) { "VideoCapturer must not be null" }
+
+        (videoCapturer as VideoCapturer).initialize(surfaceTextureHelper, surface.context, localVideoSource.capturerObserver)
+        videoCapturer.startCapture(1080, 720, 30) // Adjusted resolution to 720p
+
+        // Create local video track
+        localVideoTrack = peerConnectionFactory.createVideoTrack("local_track_video", localVideoSource)
+        checkNotNull(localVideoTrack) { "LocalVideoTrack must not be null" }
+
+        // Add the local video track to the SurfaceViewRenderer
         localVideoTrack?.addSink(surface)
-        val localAudioTrack =
-            peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
+
+        // Create local audio track
+        localAudioTrack = peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
+        checkNotNull(localAudioTrack) { "LocalAudioTrack must not be null" }
+
+        // Create and add local media stream
         val localStream = peerConnectionFactory.createLocalMediaStream("local_stream")
         localStream.addTrack(localVideoTrack)
         localStream.addTrack(localAudioTrack)
+
+        // Add the local media stream to the PeerConnection
         peerConnection?.addStream(localStream)
+
         Log.d("RtcClient", "Local video and audio streams added to PeerConnection")
     }
-    //refactor code
-//    fun startLocalVideo(surface: SurfaceViewRenderer) {
-//        checkNotNull(peerConnectionFactory) { "PeerConnectionFactory must not be null" }
-//        checkNotNull(localVideoSource) { "LocalVideoSource must not be null" }
-//        checkNotNull(peerConnection) { "PeerConnection must not be null" }
-//
-//        // Use the main looper for WebRTC operations
-//        val rtcThread = HandlerThread("RTCThread")
-//        rtcThread.start()
-//
-//        val surfaceTextureHelper =
-//            SurfaceTextureHelper.create("RTCThread", eglBase.eglBaseContext)
-//
-//        // Ensure videoCapturer is not null and properly initialized
-//        val videoCapturer = getVideoCapturer(application)
-//        checkNotNull(videoCapturer) { "VideoCapturer must not be null" }
-//
-//        videoCapturer.initialize(surfaceTextureHelper, surface.context, localVideoSource.capturerObserver)
-//        videoCapturer.startCapture(320, 240, 30) // Adjusted resolution to 720p
-//
-//        // Create local video track
-//        val localVideoTrack = peerConnectionFactory.createVideoTrack("local_track_video", localVideoSource)
-//        checkNotNull(localVideoTrack) { "LocalVideoTrack must not be null" }
-//
-//        // Add the local video track to the SurfaceViewRenderer
-//        localVideoTrack.addSink(surface)
-//
-//        // Create local audio track
-//        val localAudioTrack = peerConnectionFactory.createAudioTrack("local_track_audio", localAudioSource)
-//        checkNotNull(localAudioTrack) { "LocalAudioTrack must not be null" }
-//
-//        // Create and add local media stream
-//        val localStream = peerConnectionFactory.createLocalMediaStream("local_stream")
-//        localStream.addTrack(localVideoTrack)
-//        localStream.addTrack(localAudioTrack)
-//
-//        // Add the local media stream to the PeerConnection
-//        peerConnection.addStream(localStream)
-//
-//        Log.d("RtcClient", "Local video and audio streams added to PeerConnection")
-//    }
 
 
-    private fun getVideoCapturer(application: Application): VideoCapturer {
+    private fun getVideoCapturer(application: Application): CameraVideoCapturer {
         return Camera2Enumerator(application).run {
             deviceNames.find {
                 isFrontFacing(it)
@@ -169,7 +152,7 @@ class RtcClient(
         }
     }
 
-    fun call(userName: String, targetName: String) {
+    fun startCall(userName: String, targetName: String) {
 
         peerConnection?.createOffer(object : SdpObserver {
             override fun onCreateSuccess(sDes: SessionDescription?) {
@@ -293,6 +276,16 @@ class RtcClient(
     fun endCall() {
         peerConnection?.close()
     }
+    fun enableVideo(state: Boolean) {
+        localVideoTrack?.setEnabled(state)
+    }
 
+    fun enableAudio(state: Boolean) {
+        localAudioTrack?.setEnabled(state)
+    }
+
+    fun switchCamera() {
+        videoCapturer.switchCamera(null)
+    }
 
 }

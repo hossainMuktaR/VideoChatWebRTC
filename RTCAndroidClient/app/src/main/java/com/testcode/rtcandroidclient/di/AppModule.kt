@@ -4,6 +4,7 @@ import android.app.Application
 import com.testcode.rtcandroidclient.data.rtc.RtcClient
 import com.testcode.rtcandroidclient.data.remote.SocketClient
 import com.testcode.rtcandroidclient.data.repository.SocketRepository
+import com.testcode.rtcandroidclient.data.rtc.RtcAudioManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,5 +39,12 @@ object AppModule {
     fun provideRtcClient(app: Application, socketRepository: SocketRepository): RtcClient {
         return RtcClient(app, socketRepository)
     }
+
+    @Provides
+    @Singleton
+    fun provideRtcAudioManager(app: Application): RtcAudioManager {
+        return RtcAudioManager(app)
+    }
+
 
 }

@@ -42,6 +42,7 @@ fun UserListScreen(
     vm: UserlistViewModel = hiltViewModel()
 ) {
     BackHandler(true) {
+        vm.closeSocketConnection()
         navController.popBackStack()
     }
     val state = vm.state.value
@@ -52,6 +53,7 @@ fun UserListScreen(
             when (sideEffect) {
                 is UserListSideEffect.GoCallScreen -> {
                     Log.e("UserlistScreen","going to call screen")
+                    navController.popBackStack()
                     navController.navigate(
                         Screen.CallScreen.route +
                                 "?${Constant.USERNAMEKEY}=${sideEffect.userName}" +
