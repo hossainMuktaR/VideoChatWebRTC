@@ -1,18 +1,16 @@
 package com.testcode.rtcandroidclient.presentation.call_screen
 
-import androidx.compose.material.icons.Icons
+
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemColors
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 @Composable
 fun BottomCallController(
-    items: List<ControllerButton>,
+    items: MutableList<ControllerButton>,
     onEndClick: () -> Unit
 ) {
     NavigationBar {

@@ -106,12 +106,12 @@ class RtcClient(
         checkNotNull(localVideoSource) { "LocalVideoSource must not be null" }
         checkNotNull(peerConnection) { "PeerConnection must not be null" }
 
-        // Use the main looper for WebRTC operations
-        val rtcThread = HandlerThread("RTCThread")
-        rtcThread.start()
+//        // Use the main looper for WebRTC operations
+//        val rtcThread = HandlerThread("RTCThread")
+//        rtcThread.start()
 
         val surfaceTextureHelper =
-            SurfaceTextureHelper.create("RTCThread", eglBase.eglBaseContext)
+            SurfaceTextureHelper.create(Thread.currentThread().name, eglBase.eglBaseContext)
 
         // Ensure videoCapturer is not null and properly initialized
         checkNotNull(videoCapturer) { "VideoCapturer must not be null" }

@@ -3,7 +3,6 @@ package com.testcode.rtcandroidclient.presentation.call_screen
 import android.util.Log
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.HeadsetMic
 import androidx.compose.material.icons.filled.Mic
@@ -11,7 +10,6 @@ import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Speaker
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -58,7 +56,7 @@ class CallViewModel @Inject constructor(
     private var userName: String
     private var targetUserName: String
     private val gson = Gson()
-    val cBtnList = listOf<ControllerButton>(
+    val cBtnList = mutableListOf<ControllerButton>(
         ControllerButton(
             name = "Mic",
             enabled = _state.isMute,
@@ -183,7 +181,7 @@ class CallViewModel @Inject constructor(
                         "sdp response from offer: ${sdpResponseData.sdp}"
                     )
                     rtcClient.onRemoteSessionReceived(session)
-                    rtcClient.answer(state.userName!!, state.callerName!!)
+                    rtcClient.answer(_state.userName!!, _state.callerName!!)
                 }
 
                 ResponseType.ANSWER_RECEIVED_RESPONSE -> {
@@ -232,6 +230,7 @@ class CallViewModel @Inject constructor(
     }
 
     fun callEnd() {
+        rtcClient.endCall()
         viewModelScope.launch {
             socketRepository.tryDisconnect()
         }
